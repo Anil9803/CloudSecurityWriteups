@@ -1,1 +1,164 @@
+# **CloudFoxable CTF Challenge: It's a Secret**
+
+## **Overview**
+The **CloudFoxable CTF Challenge** is designed to test your ability to navigate AWS environments, analyze IAM policies, and extract sensitive data using **CloudFox** and AWS CLI. In this challenge, you will uncover a hidden secret stored in AWS Systems Manager (SSM) Parameter Store.
+
+## **Objectives**
+By completing this challenge, you will:
+- Learn to investigate IAM policies and attached permissions.
+- Utilize **CloudFox** for security reconnaissance in AWS.
+- Retrieve and decrypt secure data using **AWS CLI**.
+- Understand how AWS IAM policies grant or restrict access.
+
+---
+
+## **Solution**
+
+### **Step 1: Confirm AWS Credentials**
+Before proceeding, confirm that your AWS CLI profile is set up correctly:
+```sh
+aws configure --profile cloudfoxable
+```
+Verify your credentials to ensure you have access:
+```sh
+aws --profile cloudfoxable sts get-caller-identity
+```
+Expected response:
+```json
+{
+    "UserId": "AIDXXXXXXXXXXXXXXX",
+    "Account": "123456789012",
+    "Arn": "arn:aws:iam::123456789012:user/ctf-starting-user"
+}
+```
+
+---
+
+### **Step 2: Scan AWS Secrets Using CloudFox**
+Use CloudFox to scan for stored secrets across AWS services:
+```sh
+cloudfox aws -p cloudfoxable secrets -v2
+```
+After the scan completes, check the output file for discovered secrets:
+```sh
+cat ~/.cloudfox/cloudfox-output/aws/cloudfoxable/table/secrets.txt
+```
+Identify any relevant parameter, such as `/cloudfoxable/flag/its-a-secret`.
+
+---
+
+### **Step 3: Identify IAM Policies Attached to the User**
+List all IAM policies associated with the `ctf-starting-user` account:
+```sh
+aws --profile cloudfoxable iam list-attached-user-policies --user-name ctf-starting-user
+```
+Expected output:
+```json
+{
+    "AttachedPolicies": [
+        {
+            "PolicyName": "SecurityAudit",
+            "PolicyArn": "arn:aws:iam::aws:policy/SecurityAudit"
+        },
+        {
+            "PolicyName": "its-a-secret-policy",
+            "PolicyArn": "arn:aws:iam::495804826271:policy/its-a-secret-policy"
+        }
+    ]
+}
+```
+
+---
+
+### **Step 4: Examine the Custom IAM Policy**
+Retrieve details of `its-a-secret-policy` to determine granted permissions:
+```sh
+aws --profile cloudfoxable iam get-policy-version --policy-arn arn:aws:iam::495804826271:policy/its-a-secret-policy --version-id v1
+```
+Look for permissions related to parameter retrieval:
+```json
+{
+    "PolicyVersion": {
+        "Document": {
+            "Statement": [
+                {
+                    "Action": [
+                        "ssm:GetParameter"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "arn:aws:ssm:us-west-2:495804826271:parameter/cloudfoxable/flag/its-a-secret"
+                    ]
+                }
+            ],
+            "Version": "2012-10-17"
+        },
+        "VersionId": "v1",
+        "IsDefaultVersion": true
+    }
+}
+```
+
+---
+
+### **Step 5: Retrieve the Secret Parameter**
+Since we have permission to retrieve the parameter, execute:
+```sh
+aws --profile cloudfoxable ssm get-parameter --name "/cloudfoxable/flag/its-a-secret" --with-decryption --region us-west-2
+```
+Expected response:
+```json
+{
+    "Parameter": {
+        "Name": "/cloudfoxable/flag/its-a-secret",
+        "Type": "SecureString",
+        "Value": "FLAG{ConfidentialData::SecureStorageIsVital}",
+        "Version": 1
+    }
+}
+```
+Copy the `FLAG{your-secret-flag-here}` value for submission.
+
+---
+
+## **Discussion and Insights**
+
+1. **How did IAM policies allow us to retrieve the secret?**  
+   The `its-a-secret-policy` explicitly allowed `ssm:GetParameter`, granting us permission to access a specific SSM parameter.
+
+2. **Why is AWS SSM Parameter Store used for secrets management?**  
+   AWS SSM Parameter Store provides a secure way to store sensitive information such as credentials, API keys, and configuration data.
+
+3. **What best practices help protect sensitive parameters in AWS?**  
+   - Restrict access to only necessary users with **IAM least privilege principles**.
+   - Use AWS Key Management Service (KMS) for **parameter encryption**.
+   - Enable **AWS CloudTrail logging** to monitor unauthorized access attempts.
+
+4. **If this secret were stored in AWS Secrets Manager instead, how would retrieval differ?**  
+   We would use the following command instead of `ssm get-parameter`:
+   ```sh
+   aws secretsmanager get-secret-value --secret-id "/cloudfoxable/flag/its-a-secret" --profile cloudfoxable --region us-west-2
+   ```
+   AWS Secrets Manager offers **automated secret rotation**, which is not available in Parameter Store.
+
+5. **What security risks exist if CloudFox is misused?**  
+   CloudFox can be leveraged to identify security misconfigurations and excessive IAM permissions, potentially exposing secrets and credentials to attackers if not properly secured.
+
+---
+
+## **Conclusion**
+This challenge reinforced the importance of **IAM policy analysis**, **AWS security auditing**, and **CloudFox reconnaissance**. By following structured enumeration and retrieval methods, we:
+- Discovered an IAM policy allowing access to an SSM parameter.
+- Retrieved a secure secret from AWS Systems Manager.
+- Understood how IAM permissions impact security in AWS environments.
+
+For improved security, organizations should enforce **principle of least privilege**, implement **strong encryption mechanisms**, and continuously monitor access logs.
+
+---
+
+## **References**
+- [AWS Systems Manager Documentation](https://docs.aws.amazon.com/systems-manager/latest/userguide/what-is-systems-manager.html)
+- [AWS CLI SSM Commands](https://docs.aws.amazon.com/cli/latest/reference/ssm/)
+- [CloudFox GitHub Repository](https://github.com/BishopFox/cloudfox)
+
 
