@@ -2,8 +2,6 @@
 
 ## **Overview**
 The "Backwards" challenge in CloudFoxable mirrors a realistic cloud penetration testing scenario, where the goal is to start from a valuable AWS resource and trace back to identify who can access it. In this exercise, the focus is on an AWS Secrets Manager ARN, and the task involves analyzing which IAM roles or users have the necessary permissions. After identifying them, those permissions are then used to successfully retrieve the secret
-## **Starting Point**
-ARN: `arn:aws:secretsmanager:us-east-1:ACCOUNTID:secret:DomainAdministrator-Credentials-SUFFIX`
 
 CloudFoxable Setup: None required.
 
